@@ -1,0 +1,26 @@
+[package]
+name = "compa-claudio"
+version = "0.1.0"
+description = "El Compa Claudio — a floating mascot that studies code with you"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "compa_claudio_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait = "0.1"
+tokio = { version = "1", features = ["sync", "process", "time", "io-util", "macros", "rt"] }
+reqwest = { version = "0.12", features = ["json"] }
+base64 = "0.22"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"

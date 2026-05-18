@@ -1,0 +1,715 @@
+/* Transparent everything. The window is the desktop; only the mascot and bubbles have pixels. */
+:root {
+  --warm-clay: #cc785c;
+  --warm-cream: #fbeede;
+  --warm-ink: #3a2820;
+  --bubble-bg: rgba(255, 251, 246, 0.98);
+  --bubble-border: rgba(58, 40, 32, 0.08);
+  --bubble-shadow: 0 8px 24px rgba(58, 40, 32, 0.18);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", "Helvetica Neue",
+    sans-serif;
+  font-size: 14px;
+  color: var(--warm-ink);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent !important;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+}
+
+/* -------- Mascot -------- */
+#mascot {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 120px;
+  cursor: grab;
+}
+
+#mascot:active {
+  cursor: grabbing;
+}
+
+#mascot.excited {
+  animation: bob 0.6s ease-in-out infinite;
+}
+
+.mascot-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 6px 12px rgba(58, 40, 32, 0.22));
+  pointer-events: auto;
+}
+
+/* Inner SVG shapes must NOT capture mousedown — otherwise the drag-region
+   on the parent SVG never sees the event and the user can't drag the window
+   when grabbing the character's painted areas. */
+.mascot-svg * {
+  pointer-events: none;
+}
+
+.body-group {
+  transform-origin: 60px 70px;
+  animation: breathe 4.2s ease-in-out infinite;
+}
+
+.eye {
+  fill: var(--warm-ink);
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: blink 5.6s ease-in-out infinite;
+}
+
+.eye-right {
+  animation-delay: 0.04s;
+}
+
+.shadow {
+  fill: rgba(58, 40, 32, 0.18);
+  animation: shadow-pulse 4.2s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scaleY(1) scaleX(1);
+  }
+  50% {
+    transform: scaleY(1.025) scaleX(0.99);
+  }
+}
+
+@keyframes shadow-pulse {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scaleX(0.92);
+    opacity: 0.4;
+  }
+}
+
+@keyframes blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-4px);
+  }
+}
+
+/* -------- Thought bubble (the ? that appears on dwell / hover) -------- */
+#thought-bubble {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  width: 30px;
+  height: 30px;
+  background: var(--bubble-bg);
+  border: 1px solid var(--bubble-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--warm-clay);
+  box-shadow: var(--bubble-shadow);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.6) translateY(4px);
+  transition:
+    opacity 0.22s ease-out,
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+
+#thought-bubble.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+  animation: thought-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes thought-pulse {
+  0%,
+  100% {
+    box-shadow: var(--bubble-shadow), 0 0 0 0 rgba(204, 120, 92, 0.35);
+  }
+  50% {
+    box-shadow: var(--bubble-shadow), 0 0 0 6px rgba(204, 120, 92, 0);
+  }
+}
+
+.hidden {
+  display: none !important;
+}
+
+
+/* -------- Chat surface -------- */
+#chat {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 140px;
+  bottom: 12px;
+  background: var(--bubble-bg);
+  border: 1px solid var(--bubble-border);
+  border-radius: 16px;
+  box-shadow: var(--bubble-shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: pop-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#chat::before {
+  /* tail pointing up at the mascot */
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 14px;
+  height: 14px;
+  background: var(--bubble-bg);
+  border-left: 1px solid var(--bubble-border);
+  border-top: 1px solid var(--bubble-border);
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(-6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+#chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.msg {
+  max-width: 88%;
+  padding: 8px 11px;
+  border-radius: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 13px;
+}
+
+.msg.user {
+  align-self: flex-end;
+  background: var(--warm-clay);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.msg.assistant {
+  align-self: flex-start;
+  background: rgba(58, 40, 32, 0.06);
+  color: var(--warm-ink);
+  border-bottom-left-radius: 4px;
+}
+
+.msg.error {
+  align-self: flex-start;
+  background: rgba(204, 60, 60, 0.08);
+  color: #8a2a2a;
+  border-bottom-left-radius: 4px;
+  font-size: 12px;
+}
+
+.msg.thinking {
+  align-self: flex-start;
+  background: transparent;
+  color: rgba(58, 40, 32, 0.5);
+  font-style: italic;
+  padding: 4px 11px;
+}
+
+.msg.thinking::after {
+  content: "…";
+  display: inline-block;
+  animation: thinking-dots 1.4s steps(4, end) infinite;
+  width: 18px;
+  text-align: left;
+}
+
+@keyframes thinking-dots {
+  0% {
+    content: "";
+  }
+  25% {
+    content: ".";
+  }
+  50% {
+    content: "..";
+  }
+  75% {
+    content: "...";
+  }
+}
+
+#chat-form {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--bubble-border);
+  background: rgba(58, 40, 32, 0.02);
+}
+
+#chat-input {
+  flex: 1;
+  border: 1px solid var(--bubble-border);
+  border-radius: 10px;
+  padding: 7px 10px;
+  font: inherit;
+  background: white;
+  outline: none;
+  color: var(--warm-ink);
+}
+
+#chat-input:focus {
+  border-color: var(--warm-clay);
+}
+
+#chat-send {
+  border: none;
+  background: var(--warm-clay);
+  color: white;
+  border-radius: 10px;
+  width: 36px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#chat-send:hover {
+  background: #b86850;
+}
+
+#chat-send:disabled,
+#chat-screen:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#chat-screen {
+  border: 1px solid var(--bubble-border);
+  background: white;
+  color: var(--warm-clay);
+  border-radius: 10px;
+  width: 34px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+#chat-screen:hover:not(:disabled) {
+  border-color: var(--warm-clay);
+  background: rgba(204, 120, 92, 0.06);
+}
+
+.shot-badge {
+  display: block;
+  font-size: 10px;
+  opacity: 0.75;
+  margin-bottom: 3px;
+  font-style: italic;
+}
+
+/* -------- Settings -------- */
+#settings {
+  position: absolute;
+  inset: 12px;
+  background: var(--bubble-bg);
+  border: 1px solid var(--bubble-border);
+  border-radius: 16px;
+  box-shadow: var(--bubble-shadow);
+  padding: 14px 16px;
+  overflow-y: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  animation: pop-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#settings header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+#settings h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+#settings-close {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--warm-ink);
+  opacity: 0.5;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+#settings-close:hover {
+  opacity: 1;
+  background: rgba(58, 40, 32, 0.06);
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(58, 40, 32, 0.55);
+  display: block;
+  margin-bottom: 6px;
+}
+
+#backend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.backend-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--bubble-border);
+  border-radius: 10px;
+  cursor: pointer;
+  background: white;
+}
+
+.backend-option:hover {
+  border-color: var(--warm-clay);
+}
+
+.backend-option.selected {
+  border-color: var(--warm-clay);
+  background: rgba(204, 120, 92, 0.06);
+}
+
+.backend-option .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(58, 40, 32, 0.2);
+  flex: none;
+}
+
+.backend-option.available .dot {
+  background: #6ec06e;
+}
+
+.backend-option .label {
+  flex: 1;
+  font-size: 13px;
+}
+
+.backend-option .badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.5;
+}
+
+/* -------- Personality picker -------- */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--warm-ink);
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.toggle-row input {
+  accent-color: var(--warm-clay);
+  cursor: pointer;
+}
+
+#personality-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.personality-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  border: 1px solid var(--bubble-border);
+  border-radius: 10px;
+  cursor: pointer;
+  background: white;
+}
+
+.personality-option:hover {
+  border-color: var(--warm-clay);
+}
+
+.personality-option.selected {
+  border-color: var(--warm-clay);
+  background: rgba(204, 120, 92, 0.07);
+}
+
+.personality-option .swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.65);
+}
+
+.personality-option .p-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.personality-option .p-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.personality-option .p-tag {
+  font-size: 11px;
+  color: rgba(58, 40, 32, 0.55);
+}
+
+/* -------- Hat (personality accessory worn on the mascot) -------- */
+#hat-slot {
+  transform-box: fill-box;
+  transform-origin: 50% 92%;
+}
+
+#hat-slot.hat-pop {
+  animation: hat-pop 0.55s cubic-bezier(0.34, 1.6, 0.5, 1);
+}
+
+@keyframes hat-pop {
+  0% {
+    transform: translateY(-9px) scale(0.4) rotate(-14deg);
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+
+.hint {
+  font-size: 11.5px;
+  color: rgba(58, 40, 32, 0.6);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.hint code {
+  background: rgba(58, 40, 32, 0.06);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+/* -------- Floating controls -------- */
+#controls {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 3px;
+  opacity: 0.55;
+  transition: opacity 0.18s;
+  z-index: 10;
+}
+
+#stage:hover #controls {
+  opacity: 1;
+}
+
+#controls button {
+  border: none;
+  background: rgba(255, 251, 246, 0.85);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--warm-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(58, 40, 32, 0.15);
+}
+
+#controls button:hover {
+  background: white;
+}
+
+#btn-quit:hover {
+  background: #e89a8a;
+  color: white;
+}
+
+/* -------- Onboarding modal (first run, accessibility permission) --------
+   Positioned BELOW the mascot, like the chat bubble — never hides the mascot
+   itself, so the "creature is always present" feeling is preserved. */
+#onboarding {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 140px;
+  bottom: 12px;
+  background: var(--bubble-bg);
+  border: 1px solid var(--bubble-border);
+  border-radius: 16px;
+  box-shadow: var(--bubble-shadow);
+  padding: 14px 16px 12px;
+  overflow-y: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  animation: pop-in 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 5;
+}
+
+#onboarding::before {
+  /* tail pointing up at the mascot, same as the chat bubble's */
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 14px;
+  height: 14px;
+  background: var(--bubble-bg);
+  border-left: 1px solid var(--bubble-border);
+  border-top: 1px solid var(--bubble-border);
+}
+
+#onboarding h2 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--warm-clay);
+}
+
+#onboarding p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--warm-ink);
+}
+
+#onboarding p.onboarding-hint {
+  font-size: 11.5px;
+  color: rgba(58, 40, 32, 0.6);
+  font-style: italic;
+}
+
+#onboarding p strong {
+  color: var(--warm-clay);
+  font-weight: 600;
+}
+
+.onboarding-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.onboarding-buttons button {
+  flex: 1;
+  border: 1px solid var(--bubble-border);
+  border-radius: 10px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  background: white;
+  color: var(--warm-ink);
+}
+
+.onboarding-buttons button.primary {
+  background: var(--warm-clay);
+  color: white;
+  border-color: var(--warm-clay);
+}
+
+.onboarding-buttons button.primary:hover {
+  background: #b86850;
+}
+
+.onboarding-buttons button:not(.primary):hover {
+  background: rgba(58, 40, 32, 0.04);
+}
+
+#onboarding.granted h2::after {
+  content: " ✦";
+}

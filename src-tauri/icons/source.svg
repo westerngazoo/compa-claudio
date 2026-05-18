@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="hoodGrad" cx="50%" cy="38%" r="60%">
+      <stop offset="0%" stop-color="#e6a085" />
+      <stop offset="100%" stop-color="#cc785c" />
+    </radialGradient>
+    <radialGradient id="faceGrad" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#fbeede" />
+      <stop offset="100%" stop-color="#f0d9c2" />
+    </radialGradient>
+    <radialGradient id="bgGrad" cx="50%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="#fbeede" />
+      <stop offset="100%" stop-color="#f5d4be" />
+    </radialGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="22" />
+      <feOffset dx="0" dy="14" result="offsetblur" />
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3" />
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- App-icon background (warm cream so the orange guy reads against the macOS squircle) -->
+  <rect width="1024" height="1024" rx="220" ry="220" fill="url(#bgGrad)" />
+
+  <g filter="url(#softShadow)">
+    <!-- Hood -->
+    <path
+      d="M 220 500
+         Q 220 200 512 200
+         Q 804 200 804 500
+         L 804 720
+         Q 804 856 512 856
+         Q 220 856 220 720 Z"
+      fill="url(#hoodGrad)"
+    />
+
+    <!-- Face -->
+    <ellipse cx="512" cy="558" rx="244" ry="226" fill="url(#faceGrad)" />
+
+    <!-- Eyes -->
+    <ellipse cx="425" cy="540" rx="30" ry="42" fill="#3a2820" />
+    <ellipse cx="599" cy="540" rx="30" ry="42" fill="#3a2820" />
+
+    <!-- Mouth: soft smile -->
+    <path
+      d="M 445 660 Q 512 700 579 660"
+      fill="none"
+      stroke="#3a2820"
+      stroke-width="14"
+      stroke-linecap="round"
+    />
+
+    <!-- Cheek blush -->
+    <ellipse cx="358" cy="630" rx="30" ry="17" fill="#e8a890" opacity="0.55" />
+    <ellipse cx="666" cy="630" rx="30" ry="17" fill="#e8a890" opacity="0.55" />
+  </g>
+</svg>
