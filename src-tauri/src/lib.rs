@@ -21,6 +21,53 @@ use tauri::{Emitter, Manager, State};
 /// rather than a blocking AX call.
 struct ContextCache(Arc<Mutex<ChatContext>>);
 
+/// Add `fullScreenAuxiliary` (plus `canJoinAllSpaces` + `stationary`) to the
+/// window's NSWindow `collectionBehavior` — Tauri's `set_visible_on_all_workspaces`
+/// only sets `canJoinAllSpaces`, which isn't enough to float over a fullscreen
+/// app's Space. `fullScreenAuxiliary` is THE flag that lets a floating window
+/// appear over a fullscreen app (it's how Picture-in-Picture and floating
+/// tool palettes do it).
+#[cfg(target_os = "macos")]
+fn apply_fullscreen_auxiliary(window: &tauri::WebviewWindow) {
+    use objc::runtime::Object;
+    use objc::{msg_send, sel, sel_impl};
+
+    let ns_window: *mut Object = match window.ns_window() {
+        Ok(ptr) => ptr as *mut Object,
+        Err(e) => {
+            eprintln!("[overlay] ns_window err: {e}");
+            return;
+        }
+    };
+    if ns_window.is_null() {
+        eprintln!("[overlay] ns_window null");
+        return;
+    }
+
+    const CAN_JOIN_ALL_SPACES: usize = 1 << 0;
+    const STATIONARY: usize = 1 << 4;
+    const FULLSCREEN_AUXILIARY: usize = 1 << 8;
+    // NSStatusWindowLevel = 25. fullScreenAuxiliary alone sometimes isn't
+    // enough to float over a fullscreen app's Space — raising the level
+    // explicitly is the belt-and-suspenders fix.
+    const STATUS_LEVEL: i64 = 25;
+
+    unsafe {
+        let before: usize = msg_send![ns_window, collectionBehavior];
+        let new_cb = before | CAN_JOIN_ALL_SPACES | STATIONARY | FULLSCREEN_AUXILIARY;
+        let _: () = msg_send![ns_window, setCollectionBehavior: new_cb];
+        let after: usize = msg_send![ns_window, collectionBehavior];
+        let _: () = msg_send![ns_window, setLevel: STATUS_LEVEL];
+        let level: i64 = msg_send![ns_window, level];
+        eprintln!(
+            "[overlay] collectionBehavior {before:#x} -> {after:#x}  (want fullScreenAux=0x100); level={level}"
+        );
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn apply_fullscreen_auxiliary(_window: &tauri::WebviewWindow) {}
+
 /// Whether a panel (chat/settings/onboarding) is currently open. The
 /// click-through poller reads this: panel open → the whole window catches
 /// clicks; otherwise only Claudio's body and the corner controls do.
@@ -172,8 +219,28 @@ pub fn run() {
             // Tahoe (26+) — the window gets pinned to one Space.
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_visible_on_all_workspaces(true);
+                apply_fullscreen_auxiliary(&window);
+
+                // The setup-time calls above can run before the window is fully
+                // realized on macOS — re-apply a couple of times once the window
+                // has settled, so Claudio shows on whichever Space the user is
+                // actually looking at AND can float over fullscreen apps.
+                let w = window.clone();
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    for delay in [900u64, 1600] {
+                        tokio::time::sleep(Duration::from_millis(delay)).await;
+                        let _ = w.set_visible_on_all_workspaces(true);
+                        // NSWindow ops must run on the main thread.
+                        let w_main = w.clone();
+                        let _ = app_handle.run_on_main_thread(move || {
+                            apply_fullscreen_auxiliary(&w_main);
+                        });
+                    }
+                });
+
                 // Click-through poller is shelved with the transparent window.
-                // Re-enable both together if the floating look is revisited:
+                // Re-enable if the floating look gets click-through:
                 // spawn_click_through_poller(window, panel_open.clone());
             }
 
