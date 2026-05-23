@@ -6,7 +6,6 @@ import { PersonalityController, type Personality } from "./personalities";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { LogicalPosition } from "@tauri-apps/api/dpi";
 
 window.addEventListener("DOMContentLoaded", () => {
   const root = document.body;
@@ -47,63 +46,37 @@ window.addEventListener("DOMContentLoaded", () => {
   reportPanelState();
 
   // --- Window dragging -----------------------------------------------------
-  // We move the window ourselves: snapshot its position on mousedown, then
-  // reposition by the cursor delta, coalesced to one call per frame.
+  // Native macOS window drag via Tauri's startDragging — the OS itself keeps
+  // the cursor glued to wherever the user grabbed Claudio, so there's no
+  // coordinate math that can drift on multi-monitor / mixed-DPR setups.
+  // (Needed `core:window:allow-start-dragging` capability, granted in
+  // src-tauri/capabilities/default.json.)
+  //
+  // The 3-px threshold ensures a plain click / double-click doesn't kick off
+  // a drag — keeps double-click-to-open-chat working.
   const mascotEl = document.querySelector<HTMLElement>("#mascot")!;
   const win = getCurrentWindow();
-  let scaleFactor = 1;
-  void win
-    .scaleFactor()
-    .then((s) => (scaleFactor = s))
-    .catch(() => {});
 
   mascotEl.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
     const startCx = e.screenX;
     const startCy = e.screenY;
-    let baseX = 0;
-    let baseY = 0;
-    let ready = false;
-    let moved = false;
-    let latest: MouseEvent | null = null;
-    let rafId: number | null = null;
-
-    void win
-      .outerPosition()
-      .then((p) => {
-        baseX = p.x / scaleFactor;
-        baseY = p.y / scaleFactor;
-        ready = true;
-      })
-      .catch(() => {});
-
-    const apply = () => {
-      rafId = null;
-      if (!ready || !latest) return;
-      const dx = latest.screenX - startCx;
-      const dy = latest.screenY - startCy;
-      void win.setPosition(new LogicalPosition(baseX + dx, baseY + dy)).catch(() => {});
-    };
+    let started = false;
 
     const onMove = (m: MouseEvent) => {
-      // A few px of slack so a plain click / double-click doesn't move the
-      // window — keeps double-click-to-open-chat working.
-      if (!moved && Math.hypot(m.screenX - startCx, m.screenY - startCy) > 3) {
-        moved = true;
+      if (started) return;
+      if (Math.hypot(m.screenX - startCx, m.screenY - startCy) > 3) {
+        started = true;
+        cleanup();
+        void win.startDragging().catch(() => {});
       }
-      if (!moved) return;
-      latest = m;
-      if (rafId === null) rafId = requestAnimationFrame(apply);
     };
-
-    const onUp = () => {
+    const cleanup = () => {
       window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      if (rafId !== null) cancelAnimationFrame(rafId);
+      window.removeEventListener("mouseup", cleanup);
     };
-
     window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("mouseup", cleanup);
   });
 
   // Double-click the mascot → open chat.
