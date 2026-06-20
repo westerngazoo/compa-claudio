@@ -27,6 +27,7 @@ const MAX_TEXT_CHARS: usize = 4000;
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
     fn AXUIElementCreateSystemWide() -> AXUIElementRef;
+    fn AXUIElementCreateApplication(pid: i32) -> AXUIElementRef;
     fn AXUIElementCopyAttributeValue(
         element: AXUIElementRef,
         attribute: CFStringRef,
@@ -131,6 +132,57 @@ pub fn check_accessibility(prompt: bool) -> AccessibilityStatus {
     } else {
         AccessibilityStatus::NotTrusted
     }
+}
+
+/// Read context from a specific app by pid. Used when the user has explicitly
+/// targeted an app via the "Look at…" menu — bypasses the focus-based path so
+/// Claudio can study an app the user *isn't* currently focused on.
+pub fn read_context_for_pid(pid: i32) -> ChatContext {
+    let mut ctx = ChatContext::default();
+    if !matches!(check_accessibility(false), AccessibilityStatus::Trusted) {
+        return ctx;
+    }
+
+    let app_raw = unsafe { AXUIElementCreateApplication(pid) };
+    if app_raw.is_null() {
+        return ctx;
+    }
+    let app = AxElement(app_raw);
+
+    ctx.focused_app = copy_attr_string(app.as_ref(), "AXTitle");
+
+    let focused_window = copy_attr_element(app.as_ref(), "AXFocusedWindow");
+    let window_title = focused_window
+        .as_ref()
+        .and_then(|w| copy_attr_string(w.as_ref(), "AXTitle"));
+
+    let focused_element = copy_attr_element(app.as_ref(), "AXFocusedUIElement")
+        .or(focused_window);
+
+    if let Some(elem) = focused_element {
+        if let Some(sel) = copy_attr_string(elem.as_ref(), "AXSelectedText") {
+            let trimmed = sel.trim();
+            if !trimmed.is_empty() {
+                ctx.selection = Some(truncate(trimmed.to_string()));
+            }
+        }
+        if let Some(val) = copy_attr_string(elem.as_ref(), "AXValue") {
+            let trimmed = val.trim();
+            if !trimmed.is_empty() {
+                ctx.focused_text = Some(truncate(trimmed.to_string()));
+            }
+        }
+    }
+
+    if let (Some(app_name), Some(title)) = (ctx.focused_app.as_deref(), window_title.as_deref()) {
+        if !title.is_empty() && title != app_name {
+            ctx.focused_app = Some(format!("{app_name} — {title}"));
+        }
+    } else if ctx.focused_app.is_none() {
+        ctx.focused_app = window_title;
+    }
+
+    ctx
 }
 
 pub fn read_focused_context() -> ChatContext {

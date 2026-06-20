@@ -1,3 +1,4 @@
+mod apps;
 mod backends;
 mod capture;
 mod context;
@@ -47,10 +48,10 @@ fn apply_fullscreen_auxiliary(window: &tauri::WebviewWindow) {
     const CAN_JOIN_ALL_SPACES: usize = 1 << 0;
     const STATIONARY: usize = 1 << 4;
     const FULLSCREEN_AUXILIARY: usize = 1 << 8;
-    // NSStatusWindowLevel = 25. fullScreenAuxiliary alone sometimes isn't
-    // enough to float over a fullscreen app's Space — raising the level
-    // explicitly is the belt-and-suspenders fix.
-    const STATUS_LEVEL: i64 = 25;
+    // NSPopUpMenuWindowLevel = 101. Level 25 (NSStatusWindowLevel) lost to
+    // Ghostty's fullscreen window, which sits at/above it — 101 outranks
+    // fullscreen apps while staying under system-critical overlays.
+    const STATUS_LEVEL: i64 = 101;
 
     unsafe {
         let before: usize = msg_send![ns_window, collectionBehavior];
@@ -67,6 +68,65 @@ fn apply_fullscreen_auxiliary(window: &tauri::WebviewWindow) {
 
 #[cfg(not(target_os = "macos"))]
 fn apply_fullscreen_auxiliary(_window: &tauri::WebviewWindow) {}
+
+#[cfg(target_os = "macos")]
+fn set_window_level(window: &tauri::WebviewWindow, level: i64) {
+    use objc::runtime::Object;
+    use objc::{msg_send, sel, sel_impl};
+
+    if let Ok(ptr) = window.ns_window() {
+        let ns_window = ptr as *mut Object;
+        if !ns_window.is_null() {
+            unsafe {
+                let _: () = msg_send![ns_window, setLevel: level];
+            }
+            eprintln!("[overlay] window level -> {level}");
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn set_window_level(_window: &tauri::WebviewWindow, _level: i64) {}
+
+/// Keep Claudio one notch above the tallest regular-app window on screen.
+/// Hardcoded levels kept losing (Ghostty's fullscreen sat above whatever we
+/// picked), so instead: every 1.5s, scan on-screen windows of regular GUI
+/// apps, take the max level, sit at max+1. Clamped to [101, 400] so Claudio
+/// beats fullscreen apps but never fights system dialogs or the screensaver.
+fn spawn_level_poller(app_handle: tauri::AppHandle, window: tauri::WebviewWindow) {
+    tauri::async_runtime::spawn(async move {
+        let our_pid = std::process::id() as i32;
+        let mut last: i64 = 0;
+        loop {
+            tokio::time::sleep(Duration::from_millis(1500)).await;
+
+            // Both calls touch OS APIs that can stall — keep them off the
+            // async runtime thread.
+            let max = tokio::task::spawn_blocking(move || {
+                let pids: Vec<i32> = apps::list_apps().into_iter().map(|a| a.pid).collect();
+                overlay::max_app_window_level(our_pid, &pids)
+            })
+            .await
+            .ok()
+            .flatten();
+
+            let desired = max.map_or(101, |m| (m + 1).clamp(101, 400));
+            if desired != last {
+                last = desired;
+                let w = window.clone();
+                // NSWindow ops must run on the main thread.
+                let _ = app_handle.run_on_main_thread(move || {
+                    set_window_level(&w, desired);
+                });
+            }
+        }
+    });
+}
+
+/// When `Some(pid)`, the AccessibilitySensor reads context from that app
+/// explicitly instead of whatever has focus — used by the "Look at…" menu so
+/// the user can pin Claudio's attention to a specific app.
+struct TargetPid(Arc<Mutex<Option<i32>>>);
 
 /// Whether a panel (chat/settings/onboarding) is currently open. The
 /// click-through poller reads this: panel open → the whole window catches
@@ -186,6 +246,23 @@ fn set_panel_open(open: bool, state: State<'_, PanelOpen>) {
 }
 
 #[tauri::command]
+fn list_apps() -> Vec<apps::AppInfo> {
+    apps::list_apps()
+}
+
+#[tauri::command]
+fn set_target_app(pid: Option<i32>, state: State<'_, TargetPid>) {
+    if let Ok(mut g) = state.0.lock() {
+        *g = pid;
+    }
+}
+
+#[tauri::command]
+fn get_target_app(state: State<'_, TargetPid>) -> Option<i32> {
+    state.0.lock().ok().and_then(|g| *g)
+}
+
+#[tauri::command]
 fn quit_app(app: tauri::AppHandle) {
     // Hard exit — `window.close()` only sends a close *request*, which macOS
     // Tahoe can silently swallow. `exit` terminates the process for sure.
@@ -206,12 +283,14 @@ pub fn run() {
     let cache = Arc::new(Mutex::new(ChatContext::default()));
     let bus = EventBus::new();
     let panel_open = Arc::new(AtomicBool::new(false));
+    let target_pid: Arc<Mutex<Option<i32>>> = Arc::new(Mutex::new(None));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(BackendRegistry::new())
         .manage(ContextCache(cache.clone()))
         .manage(PanelOpen(panel_open.clone()))
+        .manage(TargetPid(target_pid.clone()))
         .manage(bus.clone())
         .setup(move |app| {
             // Force "visible on all workspaces" at runtime. The declarative
@@ -239,15 +318,56 @@ pub fn run() {
                     }
                 });
 
+                // Keep Claudio's level above whatever app window is tallest
+                // (Ghostty fullscreen, PiP videos, etc.) — dynamic, not guessed.
+                spawn_level_poller(app.handle().clone(), window.clone());
+
                 // Click-through poller is shelved with the transparent window.
                 // Re-enable if the floating look gets click-through:
                 // spawn_click_through_poller(window, panel_open.clone());
             }
 
+            // Menu-bar (tray) icon — Claudio's permanent home base. Even if
+            // the floating window is ever covered or lost, one click in the
+            // menu bar summons him to the current Space.
+            {
+                use tauri::menu::{Menu, MenuItem};
+                use tauri::tray::TrayIconBuilder;
+
+                let toggle =
+                    MenuItem::with_id(app, "toggle", "Show / Hide Claudio", true, None::<&str>)?;
+                let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+                let menu = Menu::with_items(app, &[&toggle, &quit])?;
+
+                TrayIconBuilder::with_id("claudio")
+                    .icon(app.default_window_icon().expect("window icon").clone())
+                    .menu(&menu)
+                    .show_menu_on_left_click(true)
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "toggle" => {
+                            if let Some(w) = app.get_webview_window("main") {
+                                if w.is_visible().unwrap_or(false) {
+                                    let _ = w.hide();
+                                } else {
+                                    let _ = w.show();
+                                    let _ = w.set_focus();
+                                    // Re-assert Space/level behavior on re-show.
+                                    let _ = w.set_visible_on_all_workspaces(true);
+                                    apply_fullscreen_auxiliary(&w);
+                                }
+                            }
+                        }
+                        "quit" => app.exit(0),
+                        _ => {}
+                    })
+                    .build(app)?;
+            }
+
             // Spawn each sensor's observation loop. Sensors publish to the bus;
             // they know nothing about who consumes their events. Adding a new
             // sensor = add one entry to this list.
-            let all_sensors: Vec<Box<dyn Sensor>> = vec![Box::new(AccessibilitySensor)];
+            let all_sensors: Vec<Box<dyn Sensor>> =
+                vec![Box::new(AccessibilitySensor::new(target_pid.clone()))];
             for sensor in all_sensors {
                 println!("[sensors] starting: {}", sensor.id());
                 let sensor_bus = bus.clone();
@@ -296,6 +416,9 @@ pub fn run() {
             capture_screen,
             quit_app,
             set_panel_open,
+            list_apps,
+            set_target_app,
+            get_target_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -26,6 +26,12 @@ pub fn read_focused_context() -> ChatContext {
     imp::read_focused_context()
 }
 
+/// Read context from a specific app by pid (the user has targeted this app
+/// explicitly via the "Look at…" menu).
+pub fn read_context_for_pid(pid: i32) -> ChatContext {
+    imp::read_context_for_pid(pid)
+}
+
 /// Check whether the process has been granted Accessibility permission.
 /// When `prompt` is true and not yet granted, macOS opens its trust prompt.
 pub fn check_accessibility(prompt: bool) -> AccessibilityStatus {

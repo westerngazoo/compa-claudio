@@ -1,0 +1,98 @@
+{
+  "cellW": 240,
+  "cellH": 288,
+  "scale": 1.2,
+  "note": "Each frame cell is 240x288 (200x240 source @1.2x), transparent background. Frames left-to-right.",
+  "animations": [
+    {
+      "name": "Idle",
+      "group": "action",
+      "frames": 3,
+      "file": "action-Idle.png"
+    },
+    {
+      "name": "Talking",
+      "group": "action",
+      "frames": 3,
+      "file": "action-Talking.png"
+    },
+    {
+      "name": "Jumping",
+      "group": "action",
+      "frames": 4,
+      "file": "action-Jumping.png"
+    },
+    {
+      "name": "Happy",
+      "group": "action",
+      "frames": 3,
+      "file": "action-Happy.png"
+    },
+    {
+      "name": "Sad",
+      "group": "action",
+      "frames": 2,
+      "file": "action-Sad.png"
+    },
+    {
+      "name": "Walk_Run",
+      "group": "action",
+      "frames": 4,
+      "file": "action-Walk_Run.png"
+    },
+    {
+      "name": "Dancing",
+      "group": "action",
+      "frames": 4,
+      "file": "action-Dancing.png"
+    },
+    {
+      "name": "Surprised",
+      "group": "action",
+      "frames": 3,
+      "file": "action-Surprised.png"
+    },
+    {
+      "name": "Angry",
+      "group": "action",
+      "frames": 3,
+      "file": "action-Angry.png"
+    },
+    {
+      "name": "Rapper",
+      "group": "persona",
+      "frames": 3,
+      "file": "persona-Rapper.png"
+    },
+    {
+      "name": "Rocker",
+      "group": "persona",
+      "frames": 3,
+      "file": "persona-Rocker.png"
+    },
+    {
+      "name": "Magician",
+      "group": "persona",
+      "frames": 3,
+      "file": "persona-Magician.png"
+    },
+    {
+      "name": "Nerd",
+      "group": "persona",
+      "frames": 2,
+      "file": "persona-Nerd.png"
+    },
+    {
+      "name": "Emo",
+      "group": "persona",
+      "frames": 2,
+      "file": "persona-Emo.png"
+    },
+    {
+      "name": "DJ",
+      "group": "persona",
+      "frames": 2,
+      "file": "persona-DJ.png"
+    }
+  ]
+}

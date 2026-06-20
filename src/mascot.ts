@@ -1,21 +1,28 @@
 import type { Personality } from "./personalities";
+import { SpriteAnimator } from "./sprite";
 
 /**
- * Mascot — El Compa Claudio's body and idle behaviors.
- * Blink + breathing are CSS-driven; this class handles the stateful moments:
- * the thought bubble, hover excitement, and swapping hats when his
- * personality changes.
+ * Mascot — El Compa Claudio (the duck) and his idle behaviors.
+ *
+ * The body is now a sprite animation (see sprite.ts) instead of inline SVG.
+ * This class owns the SpriteAnimator and the stateful moments around it:
+ * swapping persona costumes, the talking loop, one-shot reactions, the thought
+ * bubble, and hover excitement.
  */
 export class Mascot {
   private el: HTMLElement;
+  private duck: HTMLElement;
   private bubble: HTMLElement;
-  private hatSlot: SVGGElement | null;
+  private sprite: SpriteAnimator;
   private bubbleVisible = false;
+  private talking = false;
+  private idleSprite = "Idle";
 
   constructor(root: HTMLElement) {
     this.el = root.querySelector<HTMLElement>("#mascot")!;
     this.bubble = root.querySelector<HTMLElement>("#thought-bubble")!;
-    this.hatSlot = root.querySelector<SVGGElement>("#hat-slot");
+    this.duck = root.querySelector<HTMLElement>("#duck-sprite")!;
+    this.sprite = new SpriteAnimator(this.duck);
 
     this.el.addEventListener("mouseenter", () => this.setExcited(true));
     this.el.addEventListener("mouseleave", () => this.setExcited(false));
@@ -25,16 +32,40 @@ export class Mascot {
     this.el.classList.toggle("excited", on);
   }
 
-  /** Swap Claudio's hat to match a personality, with a little pop. */
+  /** Swap Claudio's costume to match a personality. */
   setPersonality(p: Personality) {
-    if (!this.hatSlot) return;
-    this.hatSlot.innerHTML = p.hatSvg;
-    // Restart the pop animation: remove the class, force a reflow, re-add.
-    this.hatSlot.classList.remove("hat-pop");
-    void this.hatSlot.getBoundingClientRect();
-    if (p.hatSvg.trim()) {
-      this.hatSlot.classList.add("hat-pop");
+    this.idleSprite = p.sprite;
+    this.sprite.setIdle(p.sprite);
+    // A CSS hop sells the costume change without dropping the sprite sheet —
+    // works for every persona, not just the bare duck.
+    this.hop();
+  }
+
+  /** Drive the talking loop while Claudio is replying. */
+  setTalking(on: boolean) {
+    if (this.talking === on) return;
+    this.talking = on;
+    this.el.classList.toggle("talking", on);
+    // Only the bare duck has a dedicated Talking strip. Costumed personas keep
+    // their costume loop (so the costume never blinks away) and lean on the
+    // CSS bob from the `.talking` class instead.
+    if (on && this.idleSprite === "Idle") {
+      this.sprite.loopWith("Talking");
+    } else if (!on && this.idleSprite === "Idle") {
+      this.sprite.rest();
     }
+  }
+
+  private hop() {
+    this.duck.classList.remove("hop");
+    void this.duck.getBoundingClientRect(); // force reflow to restart the anim
+    this.duck.classList.add("hop");
+  }
+
+  /** Play a one-shot reaction (Happy, Surprised, Jumping, …) then return idle. */
+  react(action: string) {
+    if (this.talking) return;
+    this.sprite.react(action);
   }
 
   showThought() {

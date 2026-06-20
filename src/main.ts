@@ -2,6 +2,7 @@ import { Mascot } from "./mascot";
 import { Chat } from "./chat";
 import { Settings } from "./settings";
 import { Onboarding } from "./onboarding";
+import { LookAtMenu } from "./look-at-menu";
 import { PersonalityController, type Personality } from "./personalities";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -15,13 +16,18 @@ window.addEventListener("DOMContentLoaded", () => {
   const chat = new Chat(root, personality);
   const settings = new Settings(root, personality);
   const onboarding = new Onboarding(root);
+  const lookAtMenu = new LookAtMenu(root);
 
-  // When Claudio's personality changes, swap his hat + shift the UI accent.
+  // When Claudio's personality changes, swap his costume + shift the UI accent.
   personality.onChange((p: Personality) => {
     mascot.setPersonality(p);
     document.documentElement.style.setProperty("--warm-clay", p.accent);
   });
   personality.init();
+
+  // Claudio animates while replying, and reacts to moments like a screen peek.
+  chat.onTalking = (talking) => mascot.setTalking(talking);
+  chat.onReaction = (action) => mascot.react(action);
 
   void onboarding.maybeShow();
 
@@ -56,6 +62,12 @@ window.addEventListener("DOMContentLoaded", () => {
   // a drag — keeps double-click-to-open-chat working.
   const mascotEl = document.querySelector<HTMLElement>("#mascot")!;
   const win = getCurrentWindow();
+
+  // Right-click Claudio → "Look at…" menu (pin his attention to a specific app).
+  mascotEl.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    void lookAtMenu.show(e.clientX, e.clientY);
+  });
 
   mascotEl.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
@@ -103,7 +115,8 @@ window.addEventListener("DOMContentLoaded", () => {
   // Keyboard: Esc closes panels; Cmd/Ctrl+W or +Q quits.
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (settings.isOpen()) settings.close();
+      if (lookAtMenu.isOpen()) lookAtMenu.hide();
+      else if (settings.isOpen()) settings.close();
       else if (chat.isOpen()) chat.close();
       return;
     }

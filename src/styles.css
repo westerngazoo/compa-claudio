@@ -36,101 +36,76 @@ body {
   padding: 12px;
 }
 
-/* -------- Mascot -------- */
+/* -------- Mascot (animated duck sprite) -------- */
 #mascot {
   position: absolute;
-  top: 8px;
+  top: 6px;
   left: 50%;
   transform: translateX(-50%);
-  width: 120px;
-  height: 120px;
+  width: 132px;
+  height: 162px;
   cursor: grab;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
 }
 
 #mascot:active {
   cursor: grabbing;
 }
 
-#mascot.excited {
-  animation: bob 0.6s ease-in-out infinite;
+/* The duck. SpriteAnimator sets width/height (240x288 source) + background;
+   `zoom` scales the whole box down so the hit area matches the visual, leaving
+   the transform free for hop/bob animations. The sprites carry their own soft
+   ground shadow, so no CSS drop-shadow here. */
+#duck-sprite {
+  zoom: 0.55;
+  pointer-events: none; /* events go to #mascot for drag + double-click */
+  transform-origin: center bottom;
+  will-change: transform;
 }
 
-.mascot-svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  filter: drop-shadow(0 6px 12px rgba(58, 40, 32, 0.22));
-  pointer-events: auto;
+#mascot.excited #duck-sprite {
+  animation: duck-bob 0.6s ease-in-out infinite;
 }
 
-/* Inner SVG shapes must NOT capture mousedown — otherwise the drag-region
-   on the parent SVG never sees the event and the user can't drag the window
-   when grabbing the character's painted areas. */
-.mascot-svg * {
-  pointer-events: none;
+#mascot.talking #duck-sprite {
+  animation: duck-talk 0.5s ease-in-out infinite;
 }
 
-.body-group {
-  transform-origin: 60px 70px;
-  animation: breathe 4.2s ease-in-out infinite;
+#duck-sprite.hop {
+  animation: duck-hop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.eye {
-  fill: var(--warm-ink);
-  transform-origin: center;
-  transform-box: fill-box;
-  animation: blink 5.6s ease-in-out infinite;
-}
-
-.eye-right {
-  animation-delay: 0.04s;
-}
-
-.shadow {
-  fill: rgba(58, 40, 32, 0.18);
-  animation: shadow-pulse 4.2s ease-in-out infinite;
-}
-
-@keyframes breathe {
+@keyframes duck-bob {
   0%,
   100% {
-    transform: scaleY(1) scaleX(1);
+    transform: translateY(0);
   }
   50% {
-    transform: scaleY(1.025) scaleX(0.99);
+    transform: translateY(-4px);
   }
 }
 
-@keyframes shadow-pulse {
+@keyframes duck-talk {
   0%,
   100% {
-    transform: scaleX(1);
-    opacity: 0.55;
+    transform: translateY(0) scaleY(1);
   }
   50% {
-    transform: scaleX(0.92);
-    opacity: 0.4;
+    transform: translateY(-1.5px) scaleY(1.015);
   }
 }
 
-@keyframes blink {
-  0%,
-  92%,
+@keyframes duck-hop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  35% {
+    transform: translateY(-16px) scale(1.05);
+  }
   100% {
-    transform: scaleY(1);
-  }
-  95% {
-    transform: scaleY(0.08);
-  }
-}
-
-@keyframes bob {
-  0%,
-  100% {
-    transform: translateX(-50%) translateY(0);
-  }
-  50% {
-    transform: translateX(-50%) translateY(-4px);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -473,6 +448,83 @@ body {
   opacity: 0.5;
 }
 
+/* -------- "Look at…" right-click menu -------- */
+#lookat-menu {
+  position: absolute;
+  z-index: 100;
+  min-width: 180px;
+  max-width: 240px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bubble-bg);
+  border: 1px solid var(--bubble-border);
+  border-radius: 10px;
+  box-shadow: var(--bubble-shadow);
+  padding: 4px;
+  font-size: 12px;
+  user-select: none;
+  -webkit-user-select: none;
+  animation: pop-in 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.lookat-header {
+  padding: 6px 10px 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(58, 40, 32, 0.55);
+  font-weight: 600;
+}
+
+.lookat-items {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.lookat-row {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  color: var(--warm-ink);
+  display: flex;
+  align-items: center;
+}
+
+.lookat-row:hover {
+  background: rgba(58, 40, 32, 0.06);
+}
+
+.lookat-row.selected {
+  background: rgba(204, 120, 92, 0.12);
+  color: var(--warm-clay);
+  font-weight: 500;
+}
+
+.lookat-row .lookat-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lookat-sep {
+  height: 1px;
+  background: var(--bubble-border);
+  margin: 4px 8px;
+}
+
+.lookat-empty {
+  padding: 6px 10px;
+  font-style: italic;
+  color: rgba(58, 40, 32, 0.5);
+  font-size: 11px;
+}
+
 /* -------- Personality picker -------- */
 .toggle-row {
   display: flex;
@@ -538,30 +590,6 @@ body {
 .personality-option .p-tag {
   font-size: 11px;
   color: rgba(58, 40, 32, 0.55);
-}
-
-/* -------- Hat (personality accessory worn on the mascot) -------- */
-#hat-slot {
-  transform-box: fill-box;
-  transform-origin: 50% 92%;
-}
-
-#hat-slot.hat-pop {
-  animation: hat-pop 0.55s cubic-bezier(0.34, 1.6, 0.5, 1);
-}
-
-@keyframes hat-pop {
-  0% {
-    transform: translateY(-9px) scale(0.4) rotate(-14deg);
-    opacity: 0;
-  }
-  55% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(0) scale(1) rotate(0);
-    opacity: 1;
-  }
 }
 
 .hint {

@@ -25,6 +25,11 @@ export class Chat {
   private sending = false;
   private personality: PersonalityController;
 
+  /** Fired while Claudio is "speaking" a reply, so the mascot can animate. */
+  onTalking: ((talking: boolean) => void) | null = null;
+  /** Fired for moments worth a one-shot reaction (e.g. screen capture). */
+  onReaction: ((action: string) => void) | null = null;
+
   constructor(root: HTMLElement, personality: PersonalityController) {
     this.panel = root.querySelector<HTMLElement>("#chat")!;
     this.messagesEl = root.querySelector<HTMLElement>("#chat-messages")!;
@@ -135,6 +140,7 @@ export class Chat {
       }
       shot = await invoke<string>("capture_screen");
       thinking.remove();
+      this.onReaction?.("Surprised"); // a little "oh!" when he takes a look
     } catch (err) {
       thinking.remove();
       this.appendError(typeof err === "string" ? err : String(err));
@@ -241,14 +247,20 @@ export class Chat {
   }
 
   private revealText(el: HTMLElement, text: string) {
-    // Cheap streaming-feel reveal so even Mock replies feel alive.
+    // Cheap streaming-feel reveal so even Mock replies feel alive. Claudio
+    // "talks" (animates) for the duration of the reveal.
     let i = 0;
+    this.onTalking?.(true);
     const tick = () => {
       const chunk = Math.max(1, Math.floor(text.length / 60));
       i = Math.min(i + chunk, text.length);
       el.textContent = text.slice(0, i);
       this.scrollToBottom();
-      if (i < text.length) setTimeout(tick, 14);
+      if (i < text.length) {
+        setTimeout(tick, 14);
+      } else {
+        this.onTalking?.(false);
+      }
     };
     tick();
   }

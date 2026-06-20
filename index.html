@@ -9,67 +9,14 @@
   </head>
   <body>
     <div id="stage">
-      <!-- Mascot: SVG character. Window dragging is handled manually in main.ts
-           (Tauri's drag-region attribute is unreliable on macOS Tahoe). -->
+      <!-- Mascot: animated duck sprite (frames in /sprites, driven by sprite.ts).
+           Window dragging is handled manually in main.ts (Tauri's drag-region
+           attribute is unreliable on macOS Tahoe). -->
       <div id="mascot" role="button" aria-label="El Compa Claudio">
-        <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" class="mascot-svg">
-          <defs>
-            <radialGradient id="bodyGrad" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stop-color="#e6a085" />
-              <stop offset="100%" stop-color="#cc785c" />
-            </radialGradient>
-            <radialGradient id="faceGrad" cx="50%" cy="45%" r="55%">
-              <stop offset="0%" stop-color="#fbeede" />
-              <stop offset="100%" stop-color="#f0d9c2" />
-            </radialGradient>
-          </defs>
+        <!-- The SpriteAnimator renders the current frame here via background-image. -->
+        <div id="duck-sprite"></div>
 
-          <ellipse class="shadow" cx="60" cy="108" rx="28" ry="4" />
-
-          <g class="body-group">
-            <!-- Hood / body -->
-            <path
-              class="hood"
-              d="M 26 58
-                 Q 26 22 60 22
-                 Q 94 22 94 58
-                 L 94 84
-                 Q 94 98 60 98
-                 Q 26 98 26 84 Z"
-              fill="url(#bodyGrad)"
-            />
-
-            <!-- Face -->
-            <ellipse cx="60" cy="64" rx="28" ry="26" fill="url(#faceGrad)" />
-
-            <!-- Eyes -->
-            <g class="eyes">
-              <ellipse class="eye eye-left" cx="50" cy="62" rx="3.2" ry="4.4" />
-              <ellipse class="eye eye-right" cx="70" cy="62" rx="3.2" ry="4.4" />
-            </g>
-
-            <!-- Mouth -->
-            <path
-              class="mouth"
-              d="M 53 76 Q 60 80 67 76"
-              fill="none"
-              stroke="#3a2820"
-              stroke-width="1.8"
-              stroke-linecap="round"
-            />
-
-            <!-- Cheek blush -->
-            <ellipse class="cheek" cx="44" cy="72" rx="3" ry="1.6" fill="#e8a890" opacity="0.5" />
-            <ellipse class="cheek" cx="76" cy="72" rx="3" ry="1.6" fill="#e8a890" opacity="0.5" />
-
-            <!-- Hat slot: a personality's hat SVG is injected here at runtime.
-                 Last child of body-group so it draws on top of the hood and
-                 breathes along with the head. -->
-            <g id="hat-slot"></g>
-          </g>
-        </svg>
-
-        <!-- Thought bubble that appears on dwell. Slice 2 hooks the dwell trigger; for now it pulses when something is highlighted. -->
+        <!-- Thought bubble that appears on dwell. -->
         <div id="thought-bubble" class="hidden" aria-hidden="true">
           <span>?</span>
         </div>
@@ -128,6 +75,13 @@
       <div id="controls">
         <button id="btn-settings" title="Settings" aria-label="Settings">⚙</button>
         <button id="btn-quit" title="Quit" aria-label="Quit">×</button>
+      </div>
+
+      <!-- Right-click "Look at…" menu — lets the user pin Claudio's attention
+           to a specific running app instead of whatever has keyboard focus. -->
+      <div id="lookat-menu" class="hidden">
+        <div class="lookat-header">Look at…</div>
+        <div class="lookat-items"></div>
       </div>
 
       <!-- First-run accessibility onboarding. Shown only on macOS when permission
